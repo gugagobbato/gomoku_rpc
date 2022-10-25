@@ -1,10 +1,12 @@
 import json
 import sys
+
 # caution: path[0] is reserved for script path (or '' in REPL)
 sys.path.insert(1, '../../')
 
-from tabuleiro import Tabuleiro
 from xmlrpc.server import SimpleXMLRPCServer
+
+from tabuleiro import Tabuleiro
 
 ROOT_LOG = "\033[1;33mROOT: \033[0;0m"
 ERROR_LOG = "\033[1;31mERROR: \033[0;0m"
@@ -46,13 +48,22 @@ def desconectar_cliente(clientId):
 
     id_clientes.remove(clientId)
     nr_clientes = nr_clientes - 1 if nr_clientes > 0 else 0
-    if nr_clientes < 2: jogo_iniciado = False
+
     print(ROOT_LOG, f"Cliente {clientId} desconectado.")
     print(ROOT_LOG, "Clientes conectados:", nr_clientes)
 
+    if nr_clientes < 2:
+        resetGame()
+        if jogo_iniciado:
+            print(RUNTIME_LOG, "Reiniciando partida...")
+            jogo_iniciado = False
+
+def resetGame():
+    tabuleiro.reset_tabuleiro()
+
 def obter_status_servidor(clientId, i, j):
     index_jogador = id_clientes.index(clientId) + 1
-    global iTemp, jTemp
+    global iTemp, jTemp, primeiro_jogador_aguardando
 
     if jogo_iniciado:
         if (i != None):
@@ -60,7 +71,9 @@ def obter_status_servidor(clientId, i, j):
                 tabuleiro_temp = tabuleiro.get_tabuleiro()
                 
                 if tabuleiro_temp[i][j] == 0:
-                    if tabuleiro.verificar_tabuleiro(i, j, index_jogador):
+                    verificacao_tabuleiro = tabuleiro.verificar_tabuleiro(i, j, index_jogador)
+                    
+                    if verificacao_tabuleiro:
                         return json.dumps({"nro_jogadores": len(id_clientes), "sucesso": True, "pode_jogar": False, "fim_jogo": True})
 
                     tabuleiro_temp[i][j] = index_jogador

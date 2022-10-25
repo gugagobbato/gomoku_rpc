@@ -1,23 +1,21 @@
 class Tabuleiro :
     def __init__(self) :
         self.board = [[0] * 15 for _ in range(15)]
-        self.utils = TabuleiroUtils()
     def set_tabuleiro(self, board):
         self.board = board
     def get_tabuleiro(self):
         return self.board
+    def reset_tabuleiro(self):
+        self.board = [[0] * 15 for _ in range(15)]
 
     def verificar_tabuleiro(self, i, j, nro_jogador):
         verificacao_linha = verificacao_coluna = verificacao_diagonal = False
 
-        if self.utils.verificar_linha(i, nro_jogador, board=self.board):
-            verificacao_linha = True
-        if self.utils.verificar_coluna(j, nro_jogador, board=self.board):
-            verificacao_coluna = True
-        if self.utils.verificar_diagonal(nro_jogador, board=self.board):
-            verificacao_diagonal = True
+        verificacao_linha = TabuleiroUtils.verificar_linha(i, nro_jogador, self.board)
+        verificacao_coluna = TabuleiroUtils.verificar_coluna(j, nro_jogador, self.board)
+        verificacao_diagonal = TabuleiroUtils.verificar_diagonal(nro_jogador, self.board)
 
-        return verificacao_linha and verificacao_coluna and verificacao_diagonal
+        return verificacao_linha or verificacao_coluna or verificacao_diagonal
 
 class TabuleiroUtils :
     def verificar_linha(i, nro_jogador, board):
@@ -47,6 +45,7 @@ class TabuleiroUtils :
             else:
                 count = 0
             b += 1
+
         return False
 
     def verificar_diagonal(nro_jogador, board):

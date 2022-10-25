@@ -1,31 +1,31 @@
-import os
+from glob import glob
 import json
+import os
+import sys
 import time
+import tkinter as tk
 import uuid
 import xmlrpc.client
-import tkinter as tk
 from tkinter.messagebox import showinfo
-import sys
+
 # caution: path[0] is reserved for script path (or '' in REPL)
 sys.path.insert(1, '../')
-sys.path.insert(1, '../../')
+sys.path.insert(2, '../../')
 
 from tabuleiro import Tabuleiro
-from refresh_status import RefreshInterval
 
-class StartGame:
-    def __init__(self):
-        super(StartGame, self).__init__()
+from refresh_status import RefreshInterval
 
 #### ROTAS GLOBAIS - CLIENTE
 root = tk.Tk()
 nro_jogador = 0
 nro_jogadores = 0
-StartTime=time.time()
 #### ROTAS GLOBAIS - CLIENTE
 
 clientId = uuid.uuid4().hex
 aguardando_oponente = True
+status_cliente = tk.StringVar()
+status_cliente.set('')
 
 srv_proxy = xmlrpc.client.ServerProxy("http://localhost:8000/", allow_none=True)
 
@@ -37,20 +37,22 @@ FUNCTION_ARGS_LOG = "\033[0;35mFUNCTION_ARGS: \033[0;0m"
 
 def iniciar_cliente():
     dados_rcv = json.loads(srv_proxy.conectar_cliente(clientId))
-    global aguardando_oponente, nro_jogador
+    global nro_jogador, refreshInterval
     
     try:
         nro_jogador = dados_rcv.get("nro_jogador")
 
         if (nro_jogador > 0):
             print(ROOT_LOG, "Conectado ao servidor com sucesso!")
+            refreshInterval = RefreshInterval(0.01, action)
 
             if nro_jogador == 1:
                 print(RUNTIME_LOG, "Você é o primeiro a jogar.")
-                aguardando_oponente = False
-                #refreshInterval.cancel()
+                atualizar_situacao_cliente(False)
+                refreshInterval.cancel_interval()
             else:
                 print(RUNTIME_LOG, "Você é o segundo a jogar.")
+                atualizar_situacao_cliente(True)
         else:
             showinfo("Aviso!", "Ocorreu um erro ao tentar obter dados do servidor.")
             fechar_janela()
@@ -65,23 +67,30 @@ def inserir_grid():
     gameframe = tk.Frame(root)
     gameframe.pack()
 
-    renderizar_grid()
+    tabuleiro_temp = tabuleiro.get_tabuleiro()
 
-def renderizar_grid(board_in = None):
-    board_temp = tabuleiro.get_tabuleiro()
-    if board_in != None: board_temp = board_in
-
-    linhas = len(board_temp)
-    colunas = len(board_temp[0])
+    linhas = len(tabuleiro_temp)
+    colunas = len(tabuleiro_temp[0])
 
     for i in range(linhas):
         for j in range(colunas):
-            labels_grid = tk.Label(gameframe, text="      ", bg= "white" if board_temp[i][j] == 0 else "gray" if board_temp[i][j] == 1 else "black")
-            labels_grid.grid(row=i, column=j, padx='6', pady='6')
-            labels_grid.bind('<Button-1>', lambda e, i=i, j=j: on_click_grid(i, j, e))
+            atualizar_posicao_grid(i, j, tabuleiro_temp)
+
+def atualizar_situacao_cliente(aguardando):
+    global aguardando_oponente
+
+    aguardando_oponente = aguardando
+    status_cliente.set("STATUS CLIENTE: sua vez de jogar." if not aguardando else "STATUS CLIENTE: aguardando oponente.")
+
+def atualizar_posicao_grid(i, j, board_in = None):
+    tabuleiro_temp = board_in if board_in != None else tabuleiro.get_tabuleiro()
+
+    labels_grid = tk.Label(gameframe, text="      ", bg= "white" if tabuleiro_temp[i][j] == 0 else "gray" if tabuleiro_temp[i][j] == 2 else "black")
+    labels_grid.grid(row=i, column=j, padx='6', pady='6')
+    labels_grid.bind('<Button-1>', lambda e, i=i, j=j: on_click_grid(i, j, e))
 
 def obter_status_servidor(i = None, j = None):
-    global aguardando_oponente, nro_jogadores, nro_jogador
+    global nro_jogadores, nro_jogador
 
     dados_rcv = json.loads(srv_proxy.obter_status_servidor(clientId, i, j))
     nro_jogadores_recv = dados_rcv.get("nro_jogadores")
@@ -95,7 +104,7 @@ def obter_status_servidor(i = None, j = None):
             fechar_janela(False)
 
         if nro_jogadores_recv != None and nro_jogadores_recv > 1:
-            aguardando_oponente = not bool(dados_rcv.get("pode_jogar"))
+            atualizar_situacao_cliente(not bool(dados_rcv.get("pode_jogar")))
 
         if fim_jogo_recv:
             if aguardando_oponente:
@@ -109,37 +118,68 @@ def obter_status_servidor(i = None, j = None):
             tabuleiro_temp = tabuleiro.get_tabuleiro()
             tabuleiro_temp[i_recv][j_recv] = 2 if nro_jogador != 1 else 1
             tabuleiro.set_tabuleiro(tabuleiro_temp)
-            aguardando_oponente = False
-            renderizar_grid()
+            atualizar_posicao_grid(i_recv, j_recv)
+            atualizar_situacao_cliente(False)
+
+            if refreshInterval.get_status():
+                refreshInterval.cancel_interval()
+            
+    return dados_rcv
 
 def on_click_grid(i, j, event):
     global nro_jogador
+    tabuleiro_temp = tabuleiro.get_tabuleiro()
+    backup_jogada = tabuleiro_temp[i][j]
 
     if not aguardando_oponente:
-        if tabuleiro[i][j] == 0:
-            color = "gray" if nro_jogador % 2 else "black"  # Famoso ternário do PYTHON :)
+        if tabuleiro_temp[i][j] == 0:
+            color = "gray" if nro_jogador == 1 else "black"  # Famoso ternário do PYTHON :)
             event.widget.config(bg=color)
-        elif tabuleiro[i][j] != nro_jogador:
+            tabuleiro_temp[i][j] = nro_jogador
+        elif tabuleiro_temp[i][j] != nro_jogador:
              showinfo("Aviso!", "Essa posição já foi selecionada!")
              return
 
         dados_rcv = obter_status_servidor(i, j)
+        sucesso = dados_rcv.get("sucesso")
 
-        if not bool(dados_rcv.get("sucesso")):
+        if not bool(sucesso):
             showinfo("Aviso!", "Erro ao registrar jogada no servidor.")
-            fechar_janela()
+            tabuleiro_temp[i][j] = backup_jogada
+            atualizar_posicao_grid(i, j)
+            #fechar_janela()
+        else:
+            tabuleiro.set_tabuleiro(tabuleiro_temp)
+            if not refreshInterval.get_status():
+                refreshInterval.restart_interval()
     else:
         showinfo("Aviso!", "Aguardando oponente.")
 
 def configurar_janela():
-    if os.path.isdir("themes/icons/"):
-        root.iconbitmap(bitmap='../../themes/icons/Gomoku.ico')
+    global status_cliente
 
-    root.winfo_toplevel().title("Socket's Gomoku")
+    if os.path.isdir("../../../themes/icons/"):
+        root.iconbitmap(bitmap='../../../themes/icons/Gomoku.ico')
+
+    root.winfo_toplevel().title("RPC's Gomoku")
+
+    tk.Label(root, 
+		 text="RPC's Gomoku",
+		 fg = "blue",
+         bg = "light green",
+		 font = "Verdana 25 bold").pack(pady="20")
+    tk.Label(root, 
+		 text="JOGADOR nº: " + str(nro_jogador),
+		 fg = "green",
+		 font = "Verdana 10 bold").pack(side="bottom", pady="15")
+    tk.Label(root, 
+		 textvariable = status_cliente,
+		 fg = "green",
+		 font = "Verdana 10 bold").pack(side="bottom", pady="15")
 
 def fechar_janela(mostrar_msg_saida = True, confirmar_saida = True, call_destroy = True):
-    if refreshInterval.getStatus():
-         refreshInterval.cancel()
+    if refreshInterval.get_status():
+         refreshInterval.cancel_interval()
 
     if mostrar_msg_saida:
         showinfo("Aviso!", "O jogo (cliente) será encerrado.")
@@ -164,8 +204,8 @@ def action() :
 
 tabuleiro = Tabuleiro()
 
-configurar_janela()
 iniciar_cliente()
-refreshInterval = RefreshInterval(0.5, action)
+configurar_janela()
 
 inserir_grid()
+configurar_mainloop_calls()
