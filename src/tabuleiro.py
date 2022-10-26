@@ -25,7 +25,7 @@ class TabuleiroUtils :
         while b <= total:
             if board[i][b] == nro_jogador:
                 count += 1
-                if count == 5:
+                if count == 4:
                     return True
             else:
                 count = 0
@@ -40,7 +40,7 @@ class TabuleiroUtils :
         while b <= total:
             if board[b][j] == nro_jogador:
                 count += 1
-                if count == 5:
+                if count == 4:
                     return True
             else:
                 count = 0
@@ -65,7 +65,7 @@ class TabuleiroUtils :
             for item in vetor:
                 if item == nro_jogador:
                     count += 1
-                    if count == 5:
+                    if count == 4:
                         return True
                 else:
                     count = 0
@@ -74,7 +74,7 @@ class TabuleiroUtils :
             for item in vetor:
                 if item == nro_jogador:
                     count += 1
-                    if count == 5:
+                    if count == 4:
                         return True
                 else:
                     count = 0

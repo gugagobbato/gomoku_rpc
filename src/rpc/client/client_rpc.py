@@ -1,8 +1,6 @@
-from glob import glob
 import json
 import os
 import sys
-import time
 import tkinter as tk
 import uuid
 import xmlrpc.client
@@ -44,7 +42,7 @@ def iniciar_cliente():
 
         if (nro_jogador > 0):
             print(ROOT_LOG, "Conectado ao servidor com sucesso!")
-            refreshInterval = RefreshInterval(0.01, action)
+            refreshInterval = RefreshInterval(0.2, action)
 
             if nro_jogador == 1:
                 print(RUNTIME_LOG, "Você é o primeiro a jogar.")
@@ -95,24 +93,29 @@ def obter_status_servidor(i = None, j = None):
     dados_rcv = json.loads(srv_proxy.obter_status_servidor(clientId, i, j))
     nro_jogadores_recv = dados_rcv.get("nro_jogadores")
     fim_jogo_recv = bool(dados_rcv.get("fim_jogo"))
+    sucesso = dados_rcv.get("sucesso")
     i_recv = dados_rcv.get("i")
     j_recv = dados_rcv.get("j")
 
-    if (i != None):
-        if nro_jogadores > nro_jogadores_recv:
-            showinfo("Aviso!", "O outro jogador deixou a partida. O jogo será encerrado. :/")
-            fechar_janela(False)
+    if fim_jogo_recv:
+        if aguardando_oponente:
+            showinfo("FIM DE JOGO!", "Seu oponente venceu! :/")
+        else:
+            showinfo("FIM DE JOGO!", "Você venceu! :)")
 
-        if nro_jogadores_recv != None and nro_jogadores_recv > 1:
+        fechar_janela()
+    
+    if nro_jogadores > nro_jogadores_recv:
+        showinfo("Aviso!", "O outro jogador deixou a partida. O jogo será encerrado. :/")
+        fechar_janela(False)
+
+    if nro_jogadores_recv > nro_jogadores:
+        nro_jogadores = nro_jogadores_recv
+
+    if (i != None):
+        if nro_jogadores_recv != None and nro_jogadores_recv > 1 and sucesso:
             atualizar_situacao_cliente(not bool(dados_rcv.get("pode_jogar")))
 
-        if fim_jogo_recv:
-            if aguardando_oponente:
-                showinfo("FIM DE JOGO!", "Seu oponente venceu! :/")
-            else:
-                showinfo("FIM DE JOGO!", "Você venceu! :)")
-
-            fechar_janela()
     else:
         if i_recv != None:
             tabuleiro_temp = tabuleiro.get_tabuleiro()

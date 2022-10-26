@@ -18,6 +18,7 @@ nr_clientes = 0
 id_clientes = []
 
 end_game = False
+fim_jogo = False
 jogo_iniciado = False
 tabuleiro = Tabuleiro()
 primeiro_jogador_aguardando = False
@@ -44,37 +45,46 @@ def conectar_cliente(clientId):
         return json.dumps({"nro_jogador": nr_clientes})
 
 def desconectar_cliente(clientId):
-    global jogo_iniciado, nr_clientes
+    global jogo_iniciado, nr_clientes, fim_jogo
 
-    id_clientes.remove(clientId)
+    if id_clientes.index(clientId):
+        id_clientes.remove(clientId)
+
     nr_clientes = nr_clientes - 1 if nr_clientes > 0 else 0
 
     print(ROOT_LOG, f"Cliente {clientId} desconectado.")
     print(ROOT_LOG, "Clientes conectados:", nr_clientes)
 
+    if nr_clientes < 1:
+        fim_jogo = False
+
     if nr_clientes < 2:
-        resetGame()
         if jogo_iniciado:
-            print(RUNTIME_LOG, "Reiniciando partida...")
+            resetGame()
             jogo_iniciado = False
+            print(RUNTIME_LOG, "Reiniciando partida...")
 
 def resetGame():
     tabuleiro.reset_tabuleiro()
 
 def obter_status_servidor(clientId, i, j):
     index_jogador = id_clientes.index(clientId) + 1
-    global iTemp, jTemp, primeiro_jogador_aguardando
+    global iTemp, jTemp, primeiro_jogador_aguardando, fim_jogo
+
+    if fim_jogo:
+        return json.dumps({"nro_jogadores": len(id_clientes), "sucesso": True, "pode_jogar": False, "fim_jogo": fim_jogo})
 
     if jogo_iniciado:
         if (i != None):
+            verificacao_tabuleiro = tabuleiro.verificar_tabuleiro(i, j, index_jogador)
+            if verificacao_tabuleiro:
+                fim_jogo = True
+                return json.dumps({"nro_jogadores": len(id_clientes), "sucesso": True, "pode_jogar": False, "fim_jogo": fim_jogo})
+
             if primeiro_jogador_aguardando and index_jogador == 2 or not primeiro_jogador_aguardando and index_jogador == 1:
                 tabuleiro_temp = tabuleiro.get_tabuleiro()
                 
-                if tabuleiro_temp[i][j] == 0:
-                    verificacao_tabuleiro = tabuleiro.verificar_tabuleiro(i, j, index_jogador)
-                    
-                    if verificacao_tabuleiro:
-                        return json.dumps({"nro_jogadores": len(id_clientes), "sucesso": True, "pode_jogar": False, "fim_jogo": True})
+                if tabuleiro_temp[i][j] == 0:                    
 
                     tabuleiro_temp[i][j] = index_jogador
                     iTemp = i
