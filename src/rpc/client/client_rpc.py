@@ -192,6 +192,8 @@ def fechar_janela(mostrar_msg_saida = True, confirmar_saida = True, call_destroy
 
     if call_destroy:
         root.destroy()
+    
+    exit(0)
 
 def monitorar_fechamento_janela():
     fechar_janela(False, True, False)
